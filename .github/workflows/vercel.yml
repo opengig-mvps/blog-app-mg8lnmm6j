@@ -1,0 +1,140 @@
+name: Deploy to Vercel
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: contains(github.event.head_commit.message, 'DEPLOY') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        node-version: [20]
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Deployment Status to In Progress
+        run: |
+          curl -X PATCH "https://tools-backend.dev.opengig.work/deployment/${{ github.event.repository.name }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "in_progress"}'
+      
+      - name: Create or change env file
+        run: |
+            REPO_NAME="${{ github.event.repository.name }}"
+            APP_URL="https://${REPO_NAME}.vercel.app"
+            DATABASE_URL="postgresql://opengig:Database2024!@opengigmvp.postgres.database.azure.com:5432/${REPO_NAME}?schema=public"
+        
+            # Overwrite the .env file with new content
+            cat <<EOF > .env
+            DATABASE_URL=$DATABASE_URL
+            POSTGRES_DB=$REPO_NAME
+            POSTGRES_PASSWORD=root
+            POSTGRES_USER=root
+            JWT_SECRET=$AoJ~\`)b:*zEcVw8K];X
+            JWT_EXPIRATION=10h
+            PORT=3000
+            APP_URL=$APP_URL
+            NEXTAUTH_SECRET=98E3B2CC28F61492C6934531C828C
+            NEXTAUTH_URL=$APP_URL
+            GOOGLE_CLIENT_ID=${{ secrets.ENV_GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.ENV_GOOGLE_CLIENT_SECRET }}
+            SMTP_HOST=email-smtp.ap-southeast-2.amazonaws.com
+            SMTP_PORT=587
+            SMTP_USER=${{ secrets.ENV_SMTP_USER }}
+            SMTP_PASSWORD=${{ secrets.ENV_SMTP_PASSWORD }}
+            SMTP_FROM_EMAIL=mail@opengig.work
+            EOF
+          
+            echo "Generated .env file:"
+            cat .env
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+        
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      
+      - name: Get Vercel Project ID
+        id: get_project_id
+        run: |
+          # First try to get existing project
+          RESPONSE=$(curl -s -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            "https://api.vercel.com/v9/projects/${{ github.event.repository.name }}")
+          
+          PROJECT_ID=$(echo "$RESPONSE" | jq -r '.id')
+          
+          if [ "$PROJECT_ID" = "null" ] || [ -z "$PROJECT_ID" ]; then
+            echo "Project not found, creating new project..."
+            
+            # Create new project with framework preset
+            CREATE_RESPONSE=$(curl -X POST -s \
+              -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"name\": \"${{ github.event.repository.name }}\",
+                \"framework\": \"nextjs\"
+              }" \
+              "https://api.vercel.com/v9/projects")
+            
+            PROJECT_ID=$(echo "$CREATE_RESPONSE" | jq -r '.id')
+            
+            if [ "$PROJECT_ID" = "null" ] || [ -z "$PROJECT_ID" ]; then
+              echo "Failed to create project"
+              exit 1
+            fi
+          fi
+          
+          echo "VERCEL_PROJECT_ID=$PROJECT_ID" >> $GITHUB_ENV
+          echo "Project ID: $PROJECT_ID"
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+        run: |
+          # Create vercel.json if it doesn't exist
+          if [ ! -f "vercel.json" ]; then
+            echo '{
+              "framework": "nextjs",
+              "buildCommand": "pnpm build",
+              "devCommand": "pnpm dev",
+              "installCommand": "pnpm install"
+            }' > vercel.json
+          fi
+          
+          # Pull environment and project settings
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          
+          # Build with Next.js configuration
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          
+          # Deploy using Next.js configuration
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+          curl -X PATCH "https://tools-backend.dev.opengig.work/deployment/${{ github.event.repository.name }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "success","url":"https://${{github.event.repository.name}}.vercel.app/"}'
+          
+      - name: Set Deployment Status to Failed
+        if: failure()
+        run: |
+          curl -X PATCH "https://tools-backend.dev.opengig.work/deployment/${{ github.event.repository.name }}" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed"}'

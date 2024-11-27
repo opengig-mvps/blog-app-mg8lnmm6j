@@ -4,15 +4,8 @@ import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useRouter } from "next/navigation";
-import { Loader2, LoaderCircleIcon } from "lucide-react";
+import { LoaderCircleIcon } from "lucide-react";
 import { signIn, useSession } from "next-auth/react";
 import { toast } from "sonner";
 import axios, { isAxiosError } from "axios";
@@ -21,25 +14,19 @@ const SignupPage = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const { data: session } = useSession();
   const router = useRouter();
 
   const signUpUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!role) {
-      toast.error("Please select a role");
-      return;
-    }
     try {
       setLoading(true);
       await axios.post("/api/users/signup", {
         name,
         email,
         password,
-        role,
+        role: "user",
       });
       const result = await signIn("credentials", {
         email,
@@ -60,18 +47,19 @@ const SignupPage = () => {
       setLoading(false);
     }
   };
+
   return (
-    <div className="flex items-center justify-center h-full  px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex items-center justify-center h-full bg-gray-100 px-4 py-12 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 sm:p-8">
         <div className="text-center">
-          <h2 className="sm:text-3xl text-2xl font-bold tracking-tight">
+          <h2 className="sm:text-3xl text-2xl font-bold tracking-tight text-blue-600">
             Sign up for an account
           </h2>
-          <p className="mt-4 max-sm:text-sm text-muted-foreground">
+          <p className="mt-4 max-sm:text-sm text-gray-600">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="font-medium text-primary hover:underline"
+              className="font-medium text-blue-600 hover:underline"
               prefetch={false}
             >
               Sign in
@@ -108,18 +96,6 @@ const SignupPage = () => {
             />
           </div>
           <div>
-            <Label htmlFor="role">Role</Label>
-            <Select required onValueChange={setRole} value={role}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tutor">Tutor</SelectItem>
-                <SelectItem value="student">Student</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -133,27 +109,12 @@ const SignupPage = () => {
               placeholder="Enter your password"
             />
           </div>
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full bg-blue-600 text-white">
             {loading ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : (
               "Sign up"
             )}
-          </Button>
-          <Button
-            disabled={googleLoading}
-            variant="outline"
-            className="w-full"
-            onClick={async () => {
-              setGoogleLoading(true);
-              await signIn("google", {
-                callbackUrl: `/dashboard`,
-              });
-              setGoogleLoading(false);
-            }}
-          >
-            {googleLoading && <Loader2 className="animate-spin mr-2" />} Sign in
-            with Google
           </Button>
         </form>
       </div>

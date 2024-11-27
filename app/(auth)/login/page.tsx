@@ -14,7 +14,6 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const { data: session } = useSession();
 
   const loginUser = async (e: React.FormEvent) => {
@@ -27,7 +26,7 @@ const LoginPage = () => {
         password,
       });
       if (res?.ok) {
-        router.push(`/dashboard/${session?.user?.role ?? "user"}`);
+        router.push(`/dashboard`);
       } else {
         toast.error(res?.error ?? "An error occurred");
       }
@@ -40,16 +39,16 @@ const LoginPage = () => {
 
   return (
     <div className="flex h-full items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-md rounded-2xl bg-white sm:p-8 space-y-8">
+      <div className="mx-auto w-full max-w-md rounded-2xl bg-[#ffffff] sm:p-8 space-y-8">
         <div className="text-center">
           <h2 className="sm:text-3xl text-2xl font-bold tracking-tight">
             Sign in to your account
           </h2>
-          <p className="mt-4 max-sm:text-sm text-muted-foreground">
+          <p className="mt-4 max-sm:text-sm text-[#6b7280]">
             Don't have an account?{" "}
             <Link
               href="/register"
-              className="font-medium text-primary hover:underline"
+              className="font-medium text-[#3b82f6] hover:underline"
               prefetch={false}
             >
               Register
@@ -88,7 +87,7 @@ const LoginPage = () => {
             </div>
           </div>
           <div>
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full bg-[#3b82f6] text-white">
               {loading ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : (
@@ -96,21 +95,6 @@ const LoginPage = () => {
               )}
             </Button>
           </div>
-          <Button
-            disabled={googleLoading}
-            variant="outline"
-            className="w-full"
-            onClick={async () => {
-              setGoogleLoading(true);
-              await signIn("google", {
-                callbackUrl: `/dashboard`,
-              });
-              setGoogleLoading(false);
-            }}
-          >
-            {googleLoading && <Loader2 className="animate-spin mr-2" />} Sign in
-            with Google
-          </Button>
         </form>
       </div>
     </div>
